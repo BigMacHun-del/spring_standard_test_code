@@ -27,22 +27,20 @@ public class OrderService {
 
     @Transactional
     public Order create(OrderCreateRequest request) {
-        // 주문 데이터 생성
+        // 주문 생성
         Order order = orderRepository.save(new Order(request.getTotalPrice()));
 
-        List<OrderLine> orderLineList = new ArrayList<>();
-        for (OrderLineRequest olr : request.getOrderLines()) {
-            Product product = productRepository.findById(olr.getProductId())
-                    .orElseThrow(() -> new RuntimeException("존재하지 않는 상품은 주문할 수 없습니다 !"));
+        // 주문 요청한 상품의 ID 리스트
+        List<Long> productIds = request.getOrderLines().stream()
+                .map(OrderLineRequest::getProductId)
+                .toList();
 
-            // 상품 구매 처리
-            product.purchased(olr.getAmount());
-
-            // 주문 상세 데이터 생성
-            orderLineList.add(new OrderLine(order, product, olr.getAmount()));
-        }
+        // 주문 요청한 상품 리스트 조회(OrderServiceSupport로 저장할 데이터 빌드)
+        List<Product> products = productRepository.findByIdIn(productIds);
+        List<OrderLine> orderLineList = OrderServiceSupport.buildOrderLines(products, request.getOrderLines(), order);
         orderLineRepository.saveAll(orderLineList);
         return order;
-    }
 
+        // 이렇게 되면 다른 클래스에 의존하지 않는 상태가 되어, 기본적인 CRUD만으로 구성 됐기에 테스트 할 필요성은 없어짐
+    }
 }
